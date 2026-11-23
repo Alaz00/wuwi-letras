@@ -57,4 +57,4 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     print("Servidor de letras en puerto", PUERTO)
-    HTTPServer(("127.0.0.1", PUERTO), Handler).serve_forever()
+    HTTPServer(("0.0.0.0", PUERTO), Handler).serve_forever()
