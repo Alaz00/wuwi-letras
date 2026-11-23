@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: wuwi-letras
+    runtime: python
+    plan: free
+    buildCommand: "echo sin dependencias"
+    startCommand: "python3 letras.py"
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ANTHROPIC_API_KEY
+        sync: false
