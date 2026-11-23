@@ -30,6 +30,32 @@ def pedir_letra(tema, genero):
         raise RuntimeError("La respuesta no trae 3 versos")
     return versos
 
+
+SISTEMA_WU = ("Eres Wu, el asistente que escribe letras de canciones en español de México. "
+  "Platica con la persona, entiende su idea (tema, estilo como reggaetón, pop o corridos tumbados, personas a quien va dirigida), "
+  "propone una letra y la ajusta según lo que pida. Cuando propongas la letra, ponla entre las líneas LETRA: y FIN. "
+  "Cada verso en una línea. Sé breve, cálido y claro. Nunca califiques la voz ni la imagen de la persona.")
+def pedir_chat(mensajes, genero, tema):
+    llave = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not llave:
+        raise RuntimeError("Falta ANTHROPIC_API_KEY en el servidor")
+    msgs=[{"role": m["rol"] if m["rol"] in ("user","assistant") else "user", "content": str(m["texto"])[:2000]} for m in mensajes[-20:]]
+    if not msgs or msgs[0]["role"]!="user":
+        msgs=[{"role":"user","content":f"Quiero una canción de {genero} sobre: {tema}."}]+msgs
+    cuerpo = {"model": MODELO, "max_tokens": 600, "system": SISTEMA_WU, "messages": msgs}
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=json.dumps(cuerpo).encode(),
+        headers={"x-api-key": llave, "anthropic-version": "2023-06-01", "content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=40) as r:
+        datos = json.loads(r.read())
+    texto = "".join(b.get("text","") for b in datos.get("content",[]) if b.get("type")=="text")
+    letra=None
+    if "LETRA:" in texto and "FIN" in texto:
+        bloque=texto.split("LETRA:",1)[1].split("FIN",1)[0]
+        versos=[v.strip() for v in bloque.split("\n") if v.strip()]
+        if versos: letra=versos
+    return texto.strip(), letra
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, codigo, obj):
         b = json.dumps(obj, ensure_ascii=False).encode()
@@ -46,6 +72,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self._json(200, {"servicio": "letras de Wu", "estado": "ok"})
     def do_POST(self):
+        if self.path == "/chat":
+            try:
+                n = int(self.headers.get("content-length", "0"))
+                datos = json.loads(self.rfile.read(n) or b"{}")
+                texto, letra = pedir_chat(datos.get("mensajes", []), str(datos.get("genero","pop"))[:40], str(datos.get("tema","amor"))[:120])
+                return self._json(200, {"respuesta": texto, "letra": letra})
+            except Exception as e:
+                return self._json(503, {"error": str(e)})
         if self.path != "/letra":
             return self._json(404, {"error": "no existe"})
         try:
