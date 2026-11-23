@@ -43,6 +43,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b)
     def do_OPTIONS(self):
         self._json(204, {})
+    def do_GET(self):
+        self._json(200, {"servicio": "letras de Wu", "estado": "ok"})
     def do_POST(self):
         if self.path != "/letra":
             return self._json(404, {"error": "no existe"})
